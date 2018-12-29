@@ -1,0 +1,137 @@
+---
+title: "Coursera/Reproducible Research Project 1"
+author: "Richard Ferro"
+date: "12/28/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading and preprocessing the data
+
+Reading the data into activity data frame.
+```{r}
+activity <- read.csv("activity.csv", na.strings="NA")
+head(activity)
+```
+
+Process/transform the data into a format suitable analysis.
+```{r}
+activity$date <- as.Date(activity$date)
+act <- subset(activity, !is.na(activity$steps))
+```
+
+## The mean total number of steps taken per day.
+
+```{r}
+dailysum <- tapply(act$steps, act$date, sum, na.rm=TRUE, simplify=TRUE)
+dailysum <- dailysum[!is.na(dailysum)]
+
+hist(x=dailysum,
+     col="blue",
+     breaks=25,
+     xlab="Daily total steps",
+     ylab="Frequency",
+     main="The distribution of daily total (missing data ignored)")
+     
+rmean <- mean(dailysum)
+rmedian <- median(dailysum)
+```
+The mean is `r rmean` and the median is `r rmedian`
+
+## The average daily activity pattern.
+ Calculate average steps for each interval for all days. 
+ Plot the Average Number Steps per Day by Interval. 
+ Find interval with most average steps. 
+ 
+```{r}
+a <- tapply(act$steps, act$interval, mean, na.rm=TRUE, simplify=TRUE)
+ActivityAvg <- data.frame(interval=as.integer(names(a)), avg=a)
+
+with(ActivityAvg,
+     plot(interval,
+          avg,
+          type="l",
+          xlab="5-minute intervals",
+          ylab="average steps in the interval across all days"))
+ max_steps <- max(ActivityAvg$avg)
+ ival <- ActivityAvg[ActivityAvg$avg == max_steps, ]
+```
+
+ The 5-minute interval, on average across all the days in the data set, containing the maximum number of steps is `r ival`.
+ 
+## Impute missing values. Compare imputed to non-imputed data.
+Report the total number of missing values in the dataset
+(i.e. the total number of rows with NAs) 
+ 
+```{r}
+sm <- sum(is.na(activity$steps))
+```
+The original data set has `r sm` rows with missing data.
+A simple strategy for filling in all of the missing values in the dataset.
+If a 5-minute interval has missing value, then the mean for that 5-minute interval.
+A new data frame is created, activity1, that is equal to the original dataset but with the missing data filled in (using mean for that interval for imputation).
+
+```{r}
+activity1 <- activity
+nx <- is.na(activity1$steps)
+a <- tapply(act$steps, act$interval, mean, na.rm=TRUE, simplify=TRUE)
+activity1$steps[nx] <- a[as.character(activity1$interval[nx])]
+```
+
+Make a histogram of the total number of steps taken each day.
+```{r}
+new_dailysum <- tapply(activity1$steps, activity1$date, sum, na.rm=TRUE, 
+                       simplify=TRUE)
+hist(x=new_dailysum,
+     col="blue",
+     breaks=20,
+     xlab="daily steps",
+     ylab="frequency",
+     main="The distribution of daily total (with missing data imputed)")
+```
+
+Calculate and report the mean and median total number of steps taken per day.
+
+```{r}
+imp_mean <- mean(new_dailysum)
+imp_median <- median(new_dailysum)
+```
+The imputed mean is `r imp_mean` and the imputed median is `r imp_median`
+
+Calculate difference between imputed and non-imputed data.
+```{r}
+mean_diff <- imp_mean - rmean
+med_diff <- imp_median - rmedian
+```
+The difference in the means `r mean_diff`.
+The difference in the medians `r med_diff`.
+
+## Differences in activity patterns between weekdays and weekends.
+
+```{r}
+is_weekday <- function(d) {
+  wd <- weekdays(d)
+  ifelse (wd == "Saturday" | wd == "Sunday", "weekend", "weekday")
+}
+
+wx <- sapply(activity1$date, is_weekday)
+activity1$wk <- as.factor(wx)
+head(activity1)
+
+wk_act <- aggregate(steps ~ wk+interval, data=activity1, FUN=mean)
+
+library(lattice)
+
+xyplot(steps ~ interval | factor(wk),
+       layout = c(1, 2),
+       xlab="Interval",
+       ylab="Number of steps",
+       type="l",
+       lty=1,
+       data=wk_act)
+```
+
+
